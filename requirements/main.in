@@ -2,3 +2,4 @@ deap>=1.4.1
 numpy>=1.26
 matplotlib>=3.8
 pandas>=2.1
+pydantic>=2.12

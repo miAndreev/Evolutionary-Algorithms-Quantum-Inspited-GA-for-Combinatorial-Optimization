@@ -1,0 +1,10 @@
+black
+ruff
+flake8
+flake8-requirements
+flake8-secure-coding-standard
+Flake8-pyproject
+isort
+bandit
+pylint
+

@@ -8,3 +8,6 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+report.xml
+*_venv/
+*_env/

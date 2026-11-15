@@ -75,7 +75,7 @@ update_deps: init_venv
 pre-commit_install:
 	pre-commit install -t pre-commit -t prepare-commit-msg
 
-.PHONY: pre-commit_install # Run pre-commit for all files
+.PHONY: pre-commit_runall # Run pre-commit for all files
 pre-commit_runall:
 	pre-commit run --all-files
 
