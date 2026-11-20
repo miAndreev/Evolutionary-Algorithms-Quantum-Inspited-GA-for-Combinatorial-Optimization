@@ -30,6 +30,7 @@ dependencies = { file = ["requirements/main.txt"] }
 [tool.setuptools.dynamic.optional-dependencies]
 tests = { file = ["requirements/tests.txt"] }
 linters = { file = ["requirements/linters.txt"] }
+viz = { file = ["requirements/viz.txt"] }
 
 [tool.pylint.basic]
 disable = ["missing-module-docstring", "missing-function-docstring", "missing-class-docstring", "pointless-string-statement"]
@@ -65,7 +66,7 @@ overgeneral-exceptions = ["builtins.BaseException"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "--cov=src/qiga --cov-report html --cov-report term-missing --junit-xml report.xml"
+addopts = "--cov=src/qiga --cov=src/qiga_viz --cov-report html --cov-report term-missing --junit-xml report.xml"
 testpaths = [
     "tests",
 ]
@@ -101,6 +102,8 @@ recursive = true
 exclude = ".*venv, .git"
 
 [tool.flake8]
+# qiga_viz ships in this project too (flake8-requirements only matches the project name)
+known-modules = "qiga:[qiga,qiga_viz]"
 # E203 is disabled as it has false positive for slices
 ignore = ["E203", "E402", "H306", "SCS103", "SCS109", "W503", "W504"]
 exclude = [

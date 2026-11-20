@@ -1,2 +1,3 @@
+-r viz.in
 pytest
 pytest-cov

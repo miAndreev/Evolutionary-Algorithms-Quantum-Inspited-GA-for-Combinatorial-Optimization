@@ -46,6 +46,21 @@ cover: test_init
 	umask 0022
 	${venv_path}/bin/pytest -vv -- tests
 
+# experiments
+SPEC ?= experiments/smoke.yaml
+WORKERS ?= 4
+RESULTS ?= results/smoke
+
+.PHONY: experiment # Run an experiment: make experiment SPEC=experiments/smoke.yaml WORKERS=4
+experiment: init_venv
+	${venv_path}/bin/python -m qiga run $(SPEC) -w $(WORKERS)
+
+.PHONY: report # Write figures for the latest run: make report RESULTS=results/smoke
+report: init_venv
+	VIRTUAL_ENV=${venv_path} ${venv_path}/bin/uv pip install --no-cache -r requirements/viz.txt
+	${venv_path}/bin/python -m qiga summary $(RESULTS)
+	${venv_path}/bin/python -m qiga_viz report $(RESULTS)
+
 .PHONY: dist_clean # Clean all generated files
 dist_clean: clean_venv
 	rm -rf htmlcov

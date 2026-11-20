@@ -96,6 +96,9 @@ class Knapsack(Problem):
                 best[weight:] = np.maximum(best[weight:], best[: self.capacity + 1 - weight] + value)
         return int(best[-1])
 
+    def known_optimum(self) -> float | None:
+        return float(self.exact_optimum())
+
     def _bits(self, solution: Solution) -> np.ndarray:
         bits = self._as_array(solution)
         if not np.isin(bits, (0, 1)).all():

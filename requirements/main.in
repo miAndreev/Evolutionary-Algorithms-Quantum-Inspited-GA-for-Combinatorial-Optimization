@@ -1,5 +1,6 @@
 deap>=1.4.1
 numpy>=1.26
-matplotlib>=3.8
 pandas>=2.1
+pyarrow>=21
 pydantic>=2.12
+pyyaml>=6

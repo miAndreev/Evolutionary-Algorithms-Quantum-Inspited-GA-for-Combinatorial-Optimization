@@ -1,0 +1,14 @@
+# Quick end-to-end check of the pipeline (about a minute with 4 workers).
+name: smoke
+seeds: 10
+max_evaluations: 5000
+
+problems:
+  - {type: knapsack, n: 100, correlation: strongly_correlated, seed: 0}
+  - {type: tsp, n: 30, seed: 0}
+
+algorithms:
+  - algorithm: classical_ga
+    params: {population_size: 50}
+  - algorithm: random_search
+    params: {population_size: 50}

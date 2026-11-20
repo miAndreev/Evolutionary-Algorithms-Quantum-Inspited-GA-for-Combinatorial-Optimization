@@ -58,6 +58,10 @@ class Problem(BaseModel, ABC):
     def random_solution(self, rng: np.random.Generator) -> list[int]:
         """Uniformly random solution in the encoding's domain (not necessarily feasible)."""
 
+    def known_optimum(self) -> float | None:
+        """Optimal objective value if it can be computed cheaply, used as the reference in analysis."""
+        return None
+
     def repair(self, solution: Solution) -> list[int]:
         """Map a solution to a feasible one. Problems without constraints return it unchanged."""
         return self._as_array(solution).tolist()
