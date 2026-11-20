@@ -75,6 +75,12 @@ class EvolutionaryAlgorithm[C: GAConfig](ABC):
     def evaluate(self, solution: Sequence[int] | np.ndarray) -> float:
         return self.evaluator(solution)
 
+    def prepare(self, solution: Sequence[int] | np.ndarray) -> list[int]:
+        """The solution that will actually be evaluated: repaired if ``config.repair`` is set."""
+        if self.config.repair:
+            return self.problem.repair(solution)
+        return np.asarray(solution, dtype=np.int64).tolist()
+
     def _reset(self) -> None:
         self.rng = np.random.default_rng(self.config.seed)
         self.evaluator = Evaluator(self.problem, max_evaluations=self.config.max_evaluations, target_fitness=self.config.target_fitness)

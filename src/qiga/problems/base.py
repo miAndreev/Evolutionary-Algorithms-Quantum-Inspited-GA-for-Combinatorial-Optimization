@@ -58,6 +58,10 @@ class Problem(BaseModel, ABC):
     def random_solution(self, rng: np.random.Generator) -> list[int]:
         """Uniformly random solution in the encoding's domain (not necessarily feasible)."""
 
+    def repair(self, solution: Solution) -> list[int]:
+        """Map a solution to a feasible one. Problems without constraints return it unchanged."""
+        return self._as_array(solution).tolist()
+
     def is_better(self, a: float, b: float) -> bool:
         """Whether objective value ``a`` is strictly better than ``b``."""
         return a > b if self.sense is Sense.MAXIMIZE else a < b

@@ -109,3 +109,7 @@ def test_from_coordinates_rejects_wrong_shape():
 def test_is_better_respects_sense(triangle):
     assert triangle.is_better(10, 20)
     assert not triangle.is_better(20, 10)
+
+
+def test_repair_is_identity_for_tsp(triangle):
+    assert triangle.repair(np.array([2, 0, 1])) == [2, 0, 1]
