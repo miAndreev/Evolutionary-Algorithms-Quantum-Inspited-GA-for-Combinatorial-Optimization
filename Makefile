@@ -55,11 +55,34 @@ RESULTS ?= results/smoke
 experiment: init_venv
 	${venv_path}/bin/python -m qiga run $(SPEC) -w $(WORKERS)
 
-.PHONY: report # Write figures for the latest run: make report RESULTS=results/smoke
+.PHONY: experiments_all # Run the full study: comparison, repair and both QIGA sweeps
+experiments_all: init_venv
+	@for spec in comparison repair sweep_knapsack sweep_tsp; do \
+		${venv_path}/bin/python -m qiga run experiments/$$spec.yaml -w $(WORKERS) || exit 1; \
+	done
+
+.PHONY: report # Write figures, summary and statistical tests for the latest run: make report RESULTS=results/smoke
 report: init_venv
 	VIRTUAL_ENV=${venv_path} ${venv_path}/bin/uv pip install --no-cache -r requirements/viz.txt
 	${venv_path}/bin/python -m qiga summary $(RESULTS)
 	${venv_path}/bin/python -m qiga_viz report $(RESULTS)
+
+.PHONY: reports_all # Write reports for every experiment of the full study
+reports_all: init_venv
+	VIRTUAL_ENV=${venv_path} ${venv_path}/bin/uv pip install --no-cache -r requirements/viz.txt
+	@for spec in comparison repair sweep_knapsack sweep_tsp; do \
+		${venv_path}/bin/python -m qiga_viz report results/$$spec || exit 1; \
+	done
+
+.PHONY: stats # Significance tests for the latest run: make stats RESULTS=results/comparison METRIC=anytime
+METRIC ?= gap
+stats: init_venv
+	${venv_path}/bin/python -m qiga stats $(RESULTS) -m $(METRIC)
+
+.PHONY: demo # Trace one QIGA run on TSP: Q-bit heatmap, best tour and tour animation in results/demo
+demo: init_venv
+	VIRTUAL_ENV=${venv_path} ${venv_path}/bin/uv pip install --no-cache -r requirements/viz.txt
+	${venv_path}/bin/python -m qiga_viz demo tsp -n 30 -e 10000
 
 .PHONY: dist_clean # Clean all generated files
 dist_clean: clean_venv

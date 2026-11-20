@@ -3,6 +3,8 @@
 from typing import TYPE_CHECKING
 from typing import ClassVar
 
+import numpy as np
+
 from qiga.algorithms.base import EvolutionaryAlgorithm
 from qiga.config import QIGAConfig
 from qiga.operators.rotation import lookup_table_angles
@@ -13,8 +15,6 @@ from qiga.representations.qchromosome import QChromosome
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-    import numpy as np
 
     from qiga.problems.base import Problem
 
@@ -78,6 +78,10 @@ class QIGA(EvolutionaryAlgorithm[QIGAConfig]):
     def solution(self, bits: np.ndarray) -> list[int]:
         """Problem solution encoded by a bit string (e.g. an attractor)."""
         return self.decoder.decode(bits)
+
+    def mean_p_one(self) -> np.ndarray:
+        """P(observe 1) of every Q-bit, averaged over the population."""
+        return np.mean([q.p_one() for q in self.qpopulation], axis=0)
 
     def _rotate(self) -> None:
         factor = schedule_factor(

@@ -4,10 +4,13 @@ Algorithm-specific configs (classical GA, QIGA) extend :class:`GAConfig`.
 """
 
 import math
+import re
+from typing import Annotated
 from typing import Literal
 from typing import Self
 
 from pydantic import BaseModel
+from pydantic import BeforeValidator
 from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import NonNegativeInt
@@ -71,6 +74,18 @@ class ClassicalGAConfig(GAConfig):
 
 type RotationSchedule = Literal["constant", "linear_decay"]
 
+_PI_MULTIPLE = re.compile(r"^\s*([0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)?\s*\*?\s*pi\s*$")
+
+
+def _parse_angle(value: object) -> object:
+    """Accept angles written as multiples of pi, e.g. ``"0.01pi"``, ``"0.01*pi"`` or ``"pi"``."""
+    if isinstance(value, str) and (match := _PI_MULTIPLE.match(value)):
+        return float(match.group(1) or 1.0) * math.pi
+    return value
+
+
+type Angle = Annotated[float, BeforeValidator(_parse_angle)]
+
 
 class QIGAConfig(GAConfig):
     """Quantum-inspired GA (Han & Kim). Defaults follow their 0/1 knapsack setup.
@@ -88,15 +103,16 @@ class QIGAConfig(GAConfig):
       replaced by the global best (``None`` disables it).
     * ``epsilon > 0`` applies the H_epsilon gate; ``not_gate_prob > 0`` applies the quantum
       NOT gate to each Q-bit with that probability (a mutation operator).
+    * Angles are in radians; strings like ``"0.01pi"`` are accepted (handy in YAML).
     * Permutation problems (TSP) use random-key decoding with ``bits_per_key`` Q-bits per
       element (``None``: ``ceil(log2 n) + 1``); binary problems ignore it.
     """
 
     population_size: int = Field(default=10, ge=2)
-    delta_theta: float = Field(default=0.01 * math.pi, gt=0.0, le=math.pi / 2)
-    delta_theta_better: float = Field(default=0.0, ge=0.0, le=math.pi / 2)
+    delta_theta: Angle = Field(default=0.01 * math.pi, gt=0.0, le=math.pi / 2)
+    delta_theta_better: Angle = Field(default=0.0, ge=0.0, le=math.pi / 2)
     rotation_schedule: RotationSchedule = "constant"
-    delta_theta_min: float = Field(default=0.001 * math.pi, gt=0.0)
+    delta_theta_min: Angle = Field(default=0.001 * math.pi, gt=0.0)
     local_group_size: PositiveInt = 2
     global_migration_period: PositiveInt | None = 100
     epsilon: float = Field(default=0.0, ge=0.0, lt=0.5)

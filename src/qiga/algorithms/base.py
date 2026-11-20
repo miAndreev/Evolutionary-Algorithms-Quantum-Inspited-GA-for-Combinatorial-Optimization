@@ -5,6 +5,7 @@ from abc import abstractmethod
 from time import perf_counter
 from typing import TYPE_CHECKING
 from typing import ClassVar
+from typing import Self
 
 import numpy as np
 
@@ -19,6 +20,7 @@ from qiga.problems.base import Problem
 from qiga.problems.base import Sense
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from collections.abc import Sequence
 
 
@@ -52,21 +54,26 @@ class EvolutionaryAlgorithm[C: GAConfig](ABC):
     def _population_fitness(self) -> Sequence[float]:
         """Fitness values of the current population, used for per-generation statistics."""
 
-    def run(self) -> RunResult:
-        """Run from scratch; calling ``run`` again with the same seed reproduces the result."""
+    def run(self, observer: Callable[[Self], None] | None = None) -> RunResult:
+        """Run from scratch; calling ``run`` again with the same seed reproduces the result.
+
+        ``observer`` (if given) is called with the algorithm after the initial population and
+        after every generation, e.g. to record snapshots for visualization. It must not draw
+        from ``self.rng`` or evaluate solutions, or the run would change.
+        """
         self._reset()
         start = perf_counter()
         try:
             self._initialize()
-            self._record()
+            self._record(observer)
             while (reason := self._stop_reason()) is None:
                 self.generation += 1
                 self._step()
-                self._record()
+                self._record(observer)
         except BudgetExhaustedError:
             reason = StopReason.EVALUATIONS
             if self.history:  # budget ran out mid-generation; log the evaluations it consumed
-                self._record()
+                self._record(observer)
         if not self.history:
             msg = "the evaluation budget is too small to evaluate the initial population"
             raise ValueError(msg)
@@ -96,7 +103,7 @@ class EvolutionaryAlgorithm[C: GAConfig](ABC):
             return StopReason.GENERATIONS
         return None
 
-    def _record(self) -> None:
+    def _record(self, observer: Callable[[Self], None] | None = None) -> None:
         if self.history and self.history[-1].evaluations == self.evaluator.evaluations:
             return  # nothing new happened since the last record
         fitness = np.asarray(self._population_fitness(), dtype=np.float64)
@@ -111,6 +118,8 @@ class EvolutionaryAlgorithm[C: GAConfig](ABC):
             worst=fitness.min() if maximize else fitness.max(),
         )
         self.history.append(record)
+        if observer is not None:
+            observer(self)
 
     def _result(self, reason: StopReason, elapsed: float) -> RunResult:
         return RunResult(

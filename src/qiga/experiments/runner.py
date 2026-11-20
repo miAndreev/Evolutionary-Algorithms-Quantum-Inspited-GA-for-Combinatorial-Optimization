@@ -16,9 +16,9 @@ from qiga.experiments.registry import ALGORITHMS
 from qiga.experiments.schema import CONVERGENCE_COLUMNS
 from qiga.experiments.schema import HISTORY_COLUMNS
 from qiga.experiments.schema import RUN_COLUMNS
-from qiga.experiments.schema import AlgorithmSpec
 from qiga.experiments.schema import ExperimentSpec
 from qiga.experiments.schema import ProblemSpec
+from qiga.experiments.schema import Variant
 
 if TYPE_CHECKING:
     from qiga.algorithms.result import RunResult
@@ -28,7 +28,7 @@ type ProgressCallback = Callable[[int, int], None]
 
 class _Task(NamedTuple):
     problem: ProblemSpec
-    algorithm: AlgorithmSpec
+    algorithm: Variant
     seed: int
     max_evaluations: int | None
 
@@ -52,7 +52,7 @@ def run_experiment(
     Runs are independent and seeded, so the results do not depend on ``workers``.
     """
     tasks = [
-        _Task(problem, algorithm, seed, spec.max_evaluations) for problem in spec.problems for algorithm in spec.algorithms for seed in spec.seed_list
+        _Task(problem, algorithm, seed, spec.max_evaluations) for problem in spec.problems for algorithm in spec.variants for seed in spec.seed_list
     ]
     if workers > 1:
         with ProcessPoolExecutor(max_workers=workers) as pool:

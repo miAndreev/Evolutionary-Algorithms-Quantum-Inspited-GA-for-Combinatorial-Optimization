@@ -1,0 +1,21 @@
+# Knapsack with and without greedy repair (Lamarckian: the repaired solution replaces the observed one).
+# Repair alone gets close to the optimum, so it hides most of the difference between the algorithms.
+name: repair
+seeds: 30
+max_evaluations: 30000
+
+problems:
+  - {type: knapsack, n: 250, correlation: uncorrelated, seed: 0}
+  - {type: knapsack, n: 250, correlation: weakly_correlated, seed: 0}
+  - {type: knapsack, n: 250, correlation: strongly_correlated, seed: 0}
+
+algorithms:
+  - algorithm: qiga
+  - algorithm: classical_ga
+    params: {population_size: 50}
+  - algorithm: qiga
+    label: qiga+repair
+    params: {repair: true}
+  - algorithm: classical_ga
+    label: classical_ga+repair
+    params: {population_size: 50, repair: true}

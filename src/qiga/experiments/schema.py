@@ -8,6 +8,7 @@ A results folder contains:
 * ``history.parquet``    - per-generation statistics, columns :data:`HISTORY_COLUMNS`
 """
 
+import itertools
 from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Annotated
@@ -82,26 +83,72 @@ type ProblemSpec = Annotated[KnapsackSpec | TSPSpec, Field(discriminator="type")
 
 
 class AlgorithmSpec(_Spec):
-    """One algorithm variant. ``params`` are validated against the algorithm's config model."""
+    """One algorithm variant, or a family of them.
+
+    ``params`` are validated against the algorithm's config model. ``sweep`` maps parameter
+    names to lists of values; the spec then stands for one variant per combination (the
+    cartesian product), named ``<label>[param=value,...]``. Use :meth:`variants` to expand.
+    """
 
     algorithm: str
     label: str | None = None
     params: dict[str, Any] = Field(default_factory=dict)
+    sweep: dict[str, list[Any]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _check(self) -> Self:
         if self.algorithm not in ALGORITHMS:
             msg = f"unknown algorithm {self.algorithm!r} (available: {', '.join(sorted(ALGORITHMS))})"
             raise ValueError(msg)
-        if "seed" in self.params:
+        if "seed" in self.params or "seed" in self.sweep:
             msg = "set seeds on the experiment, not in algorithm params"
             raise ValueError(msg)
-        self.config_for(seed=0)
+        if overlap := set(self.params) & set(self.sweep):
+            msg = f"parameters cannot be both fixed and swept: {sorted(overlap)}"
+            raise ValueError(msg)
+        if empty := [name for name, values in self.sweep.items() if not values]:
+            msg = f"sweep values must not be empty: {empty}"
+            raise ValueError(msg)
+        for variant in self.variants():
+            variant.config_for(seed=0)
         return self
 
     @property
     def name(self) -> str:
         return self.label or self.algorithm
+
+    def variants(self) -> list[Variant]:
+        """The concrete variants this spec stands for (just one without a sweep)."""
+        if not self.sweep:
+            return [Variant(name=self.name, family=self.name, algorithm=self.algorithm, params=self.params)]
+        names = list(self.sweep)
+        variants = []
+        for values in itertools.product(*self.sweep.values()):
+            swept = dict(zip(names, values, strict=True))
+            suffix = ",".join(f"{key}={value}" for key, value in swept.items())
+            variants.append(
+                Variant(name=f"{self.name}[{suffix}]", family=self.name, algorithm=self.algorithm, params={**self.params, **swept}, swept=swept),
+            )
+        return variants
+
+    def config_for(self, *, seed: int, max_evaluations: int | None = None) -> GAConfig:
+        """Config of the (single) variant; use :meth:`variants` for swept specs."""
+        (variant,) = self.variants()
+        return variant.config_for(seed=seed, max_evaluations=max_evaluations)
+
+
+class Variant(_Spec):
+    """A concrete algorithm configuration that is actually run.
+
+    ``family`` is the name of the spec it came from; ``swept`` holds the values chosen
+    for the swept parameters (empty if the spec has no sweep).
+    """
+
+    name: str
+    family: str
+    algorithm: str
+    params: dict[str, Any]
+    swept: dict[str, Any] = Field(default_factory=dict)
 
     def config_for(self, *, seed: int, max_evaluations: int | None = None) -> GAConfig:
         overrides: dict[str, Any] = {"seed": seed}
@@ -116,6 +163,7 @@ class AlgorithmSpec(_Spec):
 class ExperimentSpec(_Spec):
     """Every algorithm runs on every problem once per seed.
 
+    ``algorithms`` entries with a ``sweep`` expand into several variants (see :attr:`variants`).
     ``max_evaluations`` (if set) is applied to every algorithm so they get the same budget;
     the generation limit is then lifted unless an algorithm sets ``generations`` itself.
     """
@@ -128,11 +176,21 @@ class ExperimentSpec(_Spec):
 
     @model_validator(mode="after")
     def _check_unique_names(self) -> Self:
-        names = [algorithm.name for algorithm in self.algorithms]
+        names = [variant.name for variant in self.variants]
         if len(set(names)) != len(names):
             msg = f"algorithm names must be unique, use 'label' to distinguish variants: {names}"
             raise ValueError(msg)
         return self
+
+    @property
+    def variants(self) -> list[Variant]:
+        """Every concrete algorithm variant, sweeps expanded, in the order they are listed."""
+        return [variant for algorithm in self.algorithms for variant in algorithm.variants()]
+
+    @property
+    def swept_parameters(self) -> list[str]:
+        """Names of all parameters swept anywhere in the experiment, in order of appearance."""
+        return list(dict.fromkeys(name for algorithm in self.algorithms for name in algorithm.sweep))
 
     @property
     def seed_list(self) -> list[int]:

@@ -67,3 +67,14 @@ def test_config_round_trips_through_json(config_cls):
     config = config_cls(population_size=20, generations=5, max_evaluations=1000, target_fitness=42.0, seed=7)
 
     assert config_cls.model_validate_json(config.model_dump_json()) == config
+
+
+@pytest.mark.parametrize(("text", "multiple"), [("0.05pi", 0.05), ("0.01*pi", 0.01), ("1e-3 pi", 0.001), (" 0.5 * pi ", 0.5)])
+def test_angles_accept_multiples_of_pi(text, multiple):
+    assert QIGAConfig(delta_theta=text, delta_theta_min="0.0001pi").delta_theta == pytest.approx(multiple * math.pi)
+
+
+@pytest.mark.parametrize("text", ["pie", "0.01 rad", "pi"])  # "pi" parses but exceeds the pi/2 limit
+def test_bad_angle_strings_are_rejected(text):
+    with pytest.raises(ValueError):
+        QIGAConfig(delta_theta=text)

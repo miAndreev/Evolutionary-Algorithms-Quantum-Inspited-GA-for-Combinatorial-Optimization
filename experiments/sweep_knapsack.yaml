@@ -1,0 +1,23 @@
+# QIGA parameter sensitivity on knapsack. Each entry sweeps one parameter around the
+# Han & Kim defaults (delta_theta 0.01pi, 10 Q-chromosomes, no H_epsilon, global migration every 100).
+name: sweep_knapsack
+seeds: 20
+max_evaluations: 30000
+
+problems:
+  - {type: knapsack, n: 250, correlation: uncorrelated, seed: 0}
+  - {type: knapsack, n: 250, correlation: strongly_correlated, seed: 0}
+
+algorithms:
+  - algorithm: qiga
+    label: qiga
+    sweep: {delta_theta: [0.0025pi, 0.005pi, 0.01pi, 0.025pi, 0.05pi]}
+  - algorithm: qiga
+    label: qiga_population
+    sweep: {population_size: [2, 5, 10, 20, 50]}
+  - algorithm: qiga
+    label: qiga_h_epsilon
+    sweep: {epsilon: [0.0, 0.001, 0.005, 0.01, 0.02]}
+  - algorithm: qiga
+    label: qiga_migration
+    sweep: {global_migration_period: [null, 10, 50, 100, 500]}

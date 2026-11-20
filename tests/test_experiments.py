@@ -8,6 +8,7 @@ from qiga.experiments.analysis import best_so_far_on_grid
 from qiga.experiments.analysis import gap_percent
 from qiga.experiments.analysis import load_results
 from qiga.experiments.analysis import reference_values
+from qiga.experiments.analysis import run_metrics
 from qiga.experiments.analysis import summary_table
 from qiga.experiments.runner import run_experiment
 from qiga.experiments.schema import CONVERGENCE_COLUMNS
@@ -105,6 +106,71 @@ def test_duplicate_algorithm_names_need_labels():
 def test_experiment_name_is_a_safe_folder_name(name):
     with pytest.raises(ValueError):
         ExperimentSpec.model_validate({**SPEC, "name": name})
+
+
+def test_sweep_expands_to_cartesian_product():
+    spec = AlgorithmSpec(algorithm="qiga", params={"epsilon": 0.01}, sweep={"delta_theta": ["0.01pi", "0.05pi"], "bits_per_key": [4, 6]})
+
+    variants = spec.variants()
+
+    assert [v.name for v in variants] == [
+        "qiga[delta_theta=0.01pi,bits_per_key=4]",
+        "qiga[delta_theta=0.01pi,bits_per_key=6]",
+        "qiga[delta_theta=0.05pi,bits_per_key=4]",
+        "qiga[delta_theta=0.05pi,bits_per_key=6]",
+    ]
+    assert {v.family for v in variants} == {"qiga"}
+    assert variants[-1].swept == {"delta_theta": "0.05pi", "bits_per_key": 6}
+    assert variants[-1].config_for(seed=1).epsilon == 0.01
+    assert variants[-1].config_for(seed=1).bits_per_key == 6
+
+
+def test_unswept_spec_has_one_variant():
+    (variant,) = AlgorithmSpec(algorithm="qiga", label="q", params={"epsilon": 0.01}).variants()
+
+    assert (variant.name, variant.family, variant.swept) == ("q", "q", {})
+
+
+def test_swept_spec_has_no_single_config():
+    with pytest.raises(ValueError):
+        AlgorithmSpec(algorithm="qiga", sweep={"epsilon": [0.0, 0.01]}).config_for(seed=0)
+
+
+@pytest.mark.parametrize(
+    ("params", "sweep", "match"),
+    [
+        ({"epsilon": 0.1}, {"epsilon": [0.0]}, "both fixed and swept"),
+        ({}, {"epsilon": []}, "empty"),
+        ({}, {"seed": [1, 2]}, "seeds"),
+        ({}, {"epsilon": [0.0, 0.7]}, "epsilon"),
+    ],
+)
+def test_invalid_sweeps(params, sweep, match):
+    with pytest.raises(ValueError, match=match):
+        AlgorithmSpec(algorithm="qiga", params=params, sweep=sweep)
+
+
+def test_experiment_variants_and_swept_parameters():
+    algorithms = [{"algorithm": "classical_ga"}, {"algorithm": "qiga", "sweep": {"population_size": [5, 10]}}]
+    spec = ExperimentSpec.model_validate({**SPEC, "algorithms": algorithms})
+
+    assert [v.name for v in spec.variants] == ["classical_ga", "qiga[population_size=5]", "qiga[population_size=10]"]
+    assert spec.swept_parameters == ["population_size"]
+
+
+def test_sweep_names_must_not_collide():
+    algorithms = [{"algorithm": "qiga", "label": "qiga[epsilon=0.0]"}, {"algorithm": "qiga", "sweep": {"epsilon": [0.0]}}]
+    with pytest.raises(ValueError, match="unique"):
+        ExperimentSpec.model_validate({**SPEC, "algorithms": algorithms})
+
+
+def test_sweep_runs_every_variant(tmp_path):
+    spec = {**SPEC, "seeds": 1, "problems": SPEC["problems"][:1], "algorithms": [{"algorithm": "qiga", "sweep": {"population_size": [5, 10]}}]}
+
+    results = load_results(run_experiment(ExperimentSpec.model_validate(spec), tmp_path))
+
+    assert results.algorithms == ["qiga[population_size=5]", "qiga[population_size=10]"]
+    assert set(results.runs["algorithm"]) == set(results.algorithms)
 
 
 # --- runner -----------------------------------------------------------------
@@ -206,6 +272,22 @@ def test_best_so_far_on_grid_is_a_step_function(results):
     assert first_run[-1] == first_run[-2] == final
 
 
+def test_run_metrics_on_known_curve(results):
+    runs = run_metrics(results, targets=(0.0, 1000.0))
+    run = runs.iloc[0]
+    curve = results.convergence.query("problem == @run.problem and algorithm == @run.algorithm and seed == @run.seed")
+
+    reference = reference_values(results.runs)[run["problem"]]
+    gaps = gap_percent(curve["fitness"], reference)
+    widths = np.diff(np.append(curve["evaluations"].to_numpy(), run["evaluations"] + 1))
+    assert run["anytime_gap"] == pytest.approx((gaps * widths).sum() / widths.sum())
+    assert run["anytime_gap"] >= run["gap_percent"]
+    assert run["evals_to_1000"] == 1  # every gap is below 1000%
+    hit = runs["gap_percent"] <= 1e-9
+    assert runs.loc[hit, "evals_to_0"].notna().all()
+    assert runs.loc[~hit, "evals_to_0"].isna().all()
+
+
 def test_summary_table(results):
     table = summary_table(results)
 
@@ -213,6 +295,7 @@ def test_summary_table(results):
     assert (table["runs"] == 3).all()
     assert (table["gap_mean_percent"] >= 0).all()
     assert table["hit_rate"].between(0, 1).all()
+    assert (table["anytime_gap_mean"] >= table["gap_mean_percent"]).all()
 
 
 # --- CLI ----------------------------------------------------------------------

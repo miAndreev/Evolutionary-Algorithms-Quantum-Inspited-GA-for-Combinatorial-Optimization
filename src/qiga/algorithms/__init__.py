@@ -8,6 +8,9 @@ from qiga.algorithms.result import GenerationRecord
 from qiga.algorithms.result import Improvement
 from qiga.algorithms.result import RunResult
 from qiga.algorithms.result import StopReason
+from qiga.algorithms.trace import Trace
+from qiga.algorithms.trace import TraceFrame
+from qiga.algorithms.trace import run_traced
 
 __all__ = [
     "QIGA",
@@ -20,4 +23,7 @@ __all__ = [
     "RandomSearch",
     "RunResult",
     "StopReason",
+    "Trace",
+    "TraceFrame",
+    "run_traced",
 ]

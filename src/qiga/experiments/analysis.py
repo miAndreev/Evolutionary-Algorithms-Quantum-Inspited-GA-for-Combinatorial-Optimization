@@ -1,6 +1,7 @@
 """Loading a results folder and turning raw runs into comparable numbers."""
 
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 
 import numpy as np
@@ -21,11 +22,16 @@ class Results:
     @property
     def algorithms(self) -> list[str]:
         """Algorithm names in the order the experiment lists them (keeps colors stable)."""
-        return [algorithm.name for algorithm in self.spec.algorithms]
+        return [variant.name for variant in self.spec.variants]
 
     @property
     def problems(self) -> list[str]:
         return list(dict.fromkeys(self.runs["problem"]))
+
+    @cached_property
+    def runs_by_key(self) -> pd.DataFrame:
+        """``runs`` indexed by ``(problem, algorithm, seed)``."""
+        return self.runs.set_index(["problem", "algorithm", "seed"])
 
 
 def load_results(path: Path | str) -> Results:
@@ -86,13 +92,43 @@ def best_so_far_on_grid(results: Results, problem: str, grid: np.ndarray) -> pd.
     return pd.concat(rows, ignore_index=True)
 
 
-def summary_table(results: Results) -> pd.DataFrame:
-    """One row per problem x algorithm with final-quality and cost statistics."""
+def run_metrics(results: Results, targets: tuple[float, ...] = ()) -> pd.DataFrame:
+    """One row per run with comparable quality and speed measures.
+
+    * ``gap_percent`` - final distance to the reference (see :func:`reference_values`);
+    * ``anytime_gap`` - mean gap over the whole budget (area under the best-so-far gap curve
+      divided by the evaluations used): rewards finding good solutions *early*;
+    * ``evals_to_<t>`` - evaluations until the gap first dropped to ``t`` percent or below
+      (``NaN`` if the run never got there), for every ``t`` in ``targets``.
+    """
     runs = results.runs.copy()
     references = reference_values(runs)
-    runs["gap_percent"] = [
-        gap_percent(np.array([fitness]), references[problem])[0] for problem, fitness in zip(runs["problem"], runs["best_fitness"], strict=True)
-    ]
+    runs["gap_percent"] = [gap_percent(np.array([f]), references[p])[0] for p, f in zip(runs["problem"], runs["best_fitness"], strict=True)]
+    anytime: dict[tuple, float] = {}
+    reached: dict[float, dict[tuple, float]] = {target: {} for target in targets}
+    for key, run in results.convergence.groupby(["problem", "algorithm", "seed"], sort=False):
+        evaluations = run["evaluations"].to_numpy(dtype=np.float64)
+        gaps = gap_percent(run["fitness"], references[key[0]])
+        budget = max(float(results.runs_by_key.loc[key, "evaluations"]), evaluations[-1])
+        widths = np.diff(np.append(evaluations, budget + 1))  # each gap holds until the next improvement
+        anytime[key] = float((gaps * widths).sum() / widths.sum())
+        for target in targets:
+            hits = np.flatnonzero(gaps <= target + 1e-9)
+            reached[target][key] = evaluations[hits[0]] if hits.size else np.nan
+    keys = list(zip(runs["problem"], runs["algorithm"], runs["seed"], strict=True))
+    runs["anytime_gap"] = [anytime.get(key, np.nan) for key in keys]
+    for target in targets:
+        runs[target_column(target)] = [reached[target].get(key, np.nan) for key in keys]
+    return runs
+
+
+def target_column(target: float) -> str:
+    return f"evals_to_{target:g}"
+
+
+def summary_table(results: Results) -> pd.DataFrame:
+    """One row per problem x algorithm with final-quality, speed and cost statistics."""
+    runs = run_metrics(results)
     runs["hit_reference"] = runs["gap_percent"] <= 1e-9
     table = runs.groupby(["problem", "algorithm"], sort=False).agg(
         runs=("seed", "count"),
@@ -100,9 +136,10 @@ def summary_table(results: Results) -> pd.DataFrame:
         best_std=("best_fitness", "std"),
         best_median=("best_fitness", "median"),
         gap_mean_percent=("gap_percent", "mean"),
+        anytime_gap_mean=("anytime_gap", "mean"),
         hit_rate=("hit_reference", "mean"),
         evaluations_mean=("evaluations", "mean"),
         seconds_mean=("elapsed_seconds", "mean"),
     )
-    table.insert(0, "reference", [references[problem] for problem, _ in table.index])
+    table.insert(0, "reference", reference_values(results.runs).reindex([problem for problem, _ in table.index]).to_numpy())
     return table.reset_index()

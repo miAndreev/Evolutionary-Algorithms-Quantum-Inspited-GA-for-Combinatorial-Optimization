@@ -1,0 +1,18 @@
+# QIGA parameter sensitivity on TSP (random-key decoding): rotation angle x key size, and H_epsilon.
+name: sweep_tsp
+seeds: 20
+max_evaluations: 30000
+
+problems:
+  - {type: tsp, n: 30, seed: 0}
+  - {type: tsp, n: 50, seed: 0}
+
+algorithms:
+  - algorithm: qiga
+    sweep:
+      delta_theta: [0.005pi, 0.01pi, 0.025pi, 0.05pi, 0.1pi]
+      bits_per_key: [4, 6, 8]
+  - algorithm: qiga
+    label: qiga_h_epsilon
+    params: {delta_theta: 0.05pi}
+    sweep: {epsilon: [0.0, 0.001, 0.005, 0.01, 0.02]}
