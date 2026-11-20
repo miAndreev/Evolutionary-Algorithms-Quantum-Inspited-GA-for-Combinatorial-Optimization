@@ -1,5 +1,5 @@
 # Main result: QIGA vs classical GA (and random search as a floor) at an equal evaluation budget.
-# Knapsack: the three Martello-Toth correlation classes and three sizes; TSP: three sizes.
+# Knapsack: the three Pisinger correlation classes and three sizes; TSP: three sizes.
 # All algorithms run without repair here; see repair.yaml for the repaired variants.
 name: comparison
 seeds: 30
