@@ -414,6 +414,11 @@ Re-run with `make experiments_all && make reports_all`.
   uncorrelated / strongly correlated): defaults 3.07 / 3.02 %, H_ε with ε = 0.005–0.01
   **1.0–1.1 / 1.6–1.9 %**, Δθ = 0.005π 1.8 / 2.3 %, global migration every 500 generations
   1.5 / 2.6 %; turning global migration off is much worse (9.8 / 3.9 %).
+* **On TSP, H_ε helps as well, but the GA stays ahead.** Median tour length, n = 30 / 50:
+  QIGA defaults 6640 / 11424, QIGA with ε = 0.005–0.01 (Δθ = 0.05π) **6022–6521 / 10228–10352**,
+  classical GA **5532 / 9294**. The number of bits per key (4, 6 or 8) makes little difference,
+  and Δθ has no clear trend. The GA's tour-aware operators (order crossover, inversion = 2-opt move)
+  suit TSP better than rotating random-key bits, where one flipped bit can move a city anywhere in the tour.
 * **With greedy repair** both algorithms get within 0.1 % of the optimum, with no significant
   difference in final quality; the GA still gets there sooner.
 * TSP gaps are relative to the best tour any run found, not the true optimum, so compare them
