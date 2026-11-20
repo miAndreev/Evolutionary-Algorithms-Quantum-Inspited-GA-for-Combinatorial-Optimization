@@ -5,6 +5,7 @@ max_evaluations: 5000
 
 problems:
   - {type: knapsack, n: 100, correlation: strongly_correlated, seed: 0}
+  - {type: tsp, n: 30, seed: 0}
 
 algorithms:
   - algorithm: qiga

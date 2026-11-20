@@ -24,9 +24,40 @@ def run(problem, **kwargs):
     return algorithm, algorithm.run()
 
 
-def test_rejects_permutation_problems():
-    with pytest.raises(ValueError, match="binary"):
-        QIGA(generate_euclidean_tsp(5), QIGAConfig())
+@pytest.fixture
+def tsp():
+    return generate_euclidean_tsp(12, seed=0)
+
+
+def test_tsp_result_is_a_valid_tour(tsp):
+    algorithm, result = run(tsp, bits_per_key=4)
+
+    assert algorithm.decoder.n_bits == 12 * 4
+    assert sorted(result.best_solution) == list(range(12))
+    assert result.best_fitness == tsp.evaluate(result.best_solution)
+
+
+def test_tsp_attractors_decode_to_their_fitness(tsp):
+    algorithm, result = run(tsp, generations=30)
+
+    for bits, fitness in zip(algorithm.attractors, algorithm.attractor_fitness, strict=True):
+        assert tsp.evaluate(algorithm.solution(bits)) == fitness
+        assert fitness >= result.best_fitness
+
+
+def test_tsp_improves_on_random_tours(tsp):
+    rng = np.random.default_rng(0)
+    random_best = min(tsp.evaluate(tsp.random_solution(rng)) for _ in range(3000))
+
+    _, result = run(tsp, generations=10**9, max_evaluations=3000)
+
+    assert result.best_fitness < random_best
+
+
+def test_tsp_with_repair_keeps_bits_unchanged(tsp):
+    algorithm, _ = run(tsp, generations=3, repair=True)
+
+    assert all(bits.dtype == np.int8 for bits in algorithm.observed)
 
 
 def test_result_is_valid(knapsack):
@@ -77,7 +108,7 @@ def test_global_migration_shares_the_best(knapsack):
     algorithm, result = run(knapsack, generations=10, global_migration_period=10, local_group_size=1)
 
     assert all(fitness == result.best_fitness for fitness in algorithm.attractor_fitness)
-    assert all(attractor == algorithm.attractors[0] for attractor in algorithm.attractors)
+    assert all(np.array_equal(attractor, algorithm.attractors[0]) for attractor in algorithm.attractors)
 
 
 def test_local_migration_shares_within_groups(knapsack):

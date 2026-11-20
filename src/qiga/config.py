@@ -88,6 +88,8 @@ class QIGAConfig(GAConfig):
       replaced by the global best (``None`` disables it).
     * ``epsilon > 0`` applies the H_epsilon gate; ``not_gate_prob > 0`` applies the quantum
       NOT gate to each Q-bit with that probability (a mutation operator).
+    * Permutation problems (TSP) use random-key decoding with ``bits_per_key`` Q-bits per
+      element (``None``: ``ceil(log2 n) + 1``); binary problems ignore it.
     """
 
     population_size: int = Field(default=10, ge=2)
@@ -99,6 +101,7 @@ class QIGAConfig(GAConfig):
     global_migration_period: PositiveInt | None = 100
     epsilon: float = Field(default=0.0, ge=0.0, lt=0.5)
     not_gate_prob: float = Field(default=0.0, ge=0.0, le=1.0)
+    bits_per_key: int | None = Field(default=None, ge=1, le=30)
 
     @model_validator(mode="after")
     def _check_qiga(self) -> Self:
