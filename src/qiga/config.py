@@ -34,4 +34,7 @@ class GAConfig(BaseModel):
         if self.elitism >= self.population_size:
             msg = f"elitism ({self.elitism}) must be smaller than population_size ({self.population_size})"
             raise ValueError(msg)
+        if self.max_evaluations is not None and self.max_evaluations < self.population_size:
+            msg = f"max_evaluations ({self.max_evaluations}) must allow at least one population ({self.population_size})"
+            raise ValueError(msg)
         return self
