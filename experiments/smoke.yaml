@@ -5,9 +5,10 @@ max_evaluations: 5000
 
 problems:
   - {type: knapsack, n: 100, correlation: strongly_correlated, seed: 0}
-  - {type: tsp, n: 30, seed: 0}
 
 algorithms:
+  - algorithm: qiga
+    params: {population_size: 10}
   - algorithm: classical_ga
     params: {population_size: 50}
   - algorithm: random_search
